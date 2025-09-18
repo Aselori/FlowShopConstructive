@@ -23,24 +23,68 @@ pip install -r requirements.txt
 
 ### Command Line Interface
 
+#### Basic Usage
 ```bash
 # Run with sample data (automatically generated)
 python main.py
 
 # Run with your own CSV file
 python main.py your_data.csv
+python main.py sample_flow_shop_data.csv
+python main.py test_data_no_headers.csv
+```
 
+#### Improvement Method Selection
+```bash
 # Run only NEH heuristic (no improvements)
 python main.py your_data.csv --no-improvements
 
 # Use specific improvement methods
-python main.py your_data.csv --methods 2opt insert
+python main.py your_data.csv --methods 2opt
+python main.py your_data.csv --methods insert
+python main.py your_data.csv --methods vns
+python main.py your_data.csv --methods genetic
 
-# Quiet mode (minimal output)
+# Combine multiple methods
+python main.py your_data.csv --methods 2opt insert
+python main.py your_data.csv --methods vns genetic
+python main.py your_data.csv --methods 2opt insert vns genetic
+```
+
+#### Output Control
+```bash
+# Quiet mode (minimal output - just final results)
 python main.py your_data.csv --quiet
 
-# Create sample data
+# Full verbose output (default)
+python main.py your_data.csv
+```
+
+#### Sample Data Generation
+```bash
+# Create sample data with default size (5 jobs, 3 machines)
+python main.py --create-sample sample.csv
+
+# Create custom sized sample data
 python main.py --create-sample sample.csv --sample-jobs 6 --sample-machines 4
+python main.py --create-sample large_test.csv --sample-jobs 10 --sample-machines 5
+python main.py --create-sample small_test.csv --sample-jobs 3 --sample-machines 2
+```
+
+#### Complete Examples
+```bash
+# Quick analysis with genetic algorithm only
+python main.py data.csv --methods genetic --quiet
+
+# Comprehensive analysis with all methods
+python main.py data.csv --methods 2opt insert vns genetic
+
+# Fast local search only (for large problems)
+python main.py large_data.csv --methods 2opt insert
+
+# Generate and solve custom problem
+python main.py --create-sample test.csv --sample-jobs 8 --sample-machines 4
+python main.py test.csv --methods vns genetic
 ```
 
 ### Programmatic Usage
@@ -119,10 +163,46 @@ Each row represents a job, and each column represents processing time on a machi
 4. Continue until all jobs are scheduled
 
 ### Improvement Methods
-- **2-opt**: Tries all possible job swaps to find improvements
-- **Insert**: Tries moving each job to every other position
-- **VNS**: Combines multiple neighborhood structures with perturbation
-- **Genetic**: Evolves a population of solutions using crossover and mutation
+
+#### Local Search Algorithms
+
+**2-opt Local Search (`2opt`)**
+- **Method**: Swap-based neighborhood search
+- **Complexity**: O(n²) per iteration
+- **How it works**: Tries all possible pairs of job swaps to find improvements
+- **Parameters**: Max iterations (1000)
+- **Best for**: Quick improvements with minimal computational cost
+
+**Insertion Local Search (`insert`)**
+- **Method**: Position-based neighborhood search  
+- **Complexity**: O(n²) per iteration
+- **How it works**: Moves each job to every other position to find better sequences
+- **Parameters**: Max iterations (1000)
+- **Best for**: Finding different sequence structures than swap-based methods
+
+#### Metaheuristic Algorithms
+
+**Variable Neighborhood Search (`vns`)**
+- **Method**: Multi-neighborhood approach with perturbation
+- **How it works**: Combines 2-opt and insertion search with random perturbations
+- **Parameters**: Max iterations (100), perturbation swaps (2)
+- **Features**: Escapes local optima through diversification
+- **Best for**: Balanced exploration and exploitation
+
+**Genetic Algorithm (`genetic`)**
+- **Method**: Population-based evolutionary algorithm
+- **Default Parameters**:
+  - Population size: 50
+  - Mutation rate: 0.1 (10%)
+  - Crossover rate: 0.8 (80%)
+  - Elite size: 5
+  - Generations: 50 (for improvements), 100 (standalone)
+- **Operators**:
+  - **Selection**: Tournament selection (size 3)
+  - **Crossover**: Order crossover (OX) for permutation representation
+  - **Mutation**: Swap mutation
+  - **Replacement**: Elitism with generational replacement
+- **Best for**: Complex problems where local search gets trapped
 
 ## Example Output
 
@@ -177,10 +257,27 @@ Improvement over NEH: 0.0%
 
 ## Performance Considerations
 
-- NEH heuristic: O(n³m) where n = jobs, m = machines
-- Local search methods: Depends on neighborhood size and iterations
-- Genetic algorithm: Most computationally intensive but often finds better solutions
-- For large problems (>20 jobs), consider using fewer improvement methods
+### Algorithm Complexity
+- **NEH heuristic**: O(n³m) where n = jobs, m = machines
+- **2-opt local search**: O(n² × iterations) - typically fast
+- **Insertion local search**: O(n² × iterations) - similar to 2-opt
+- **Variable Neighborhood Search**: O(n² × iterations × neighborhoods) - moderate
+- **Genetic algorithm**: O(population × generations × n × m) - most intensive
+
+### Performance Comparison
+
+| Method | Speed | Quality | Memory Usage | Recommended For |
+|--------|-------|---------|--------------|-----------------|
+| `2opt` | ⚡ Very Fast | Good | Low | Quick optimization |
+| `insert` | ⚡ Very Fast | Good | Low | Alternative neighborhoods |
+| `vns` | 🔄 Medium | Better | Medium | Balanced approach |
+| `genetic` | 🐌 Slow | Best | High | Complex/large problems |
+
+### Scaling Guidelines
+- **Small problems** (≤10 jobs): Use all methods
+- **Medium problems** (11-20 jobs): Skip genetic or reduce generations
+- **Large problems** (>20 jobs): Use only local search methods
+- **Very large problems** (>50 jobs): Consider NEH only for initial assessment
 
 ## Error Handling
 
