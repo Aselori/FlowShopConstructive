@@ -243,6 +243,45 @@ def johnsons_rule(machine1_times: List[float], machine2_times: List[float]) -> L
     return sequence
 
 
+def pendulum_heuristic(processing_times: List[List[float]]) -> List[int]:
+    """
+    Pendulum heuristic: place jobs with smaller total times at extremes,
+    larger total times in the center (like a pendulum weight distribution).
+    
+    Args:
+        processing_times (List[List[float]]): Matrix of processing times
+        
+    Returns:
+        List[int]: Sequence following pendulum pattern
+    """
+    if not processing_times:
+        return []
+    
+    num_jobs = len(processing_times)
+    
+    # Calculate total processing time for each job and sort ascending
+    job_totals = [(i, calculate_total_processing_time(processing_times, i)) 
+                  for i in range(num_jobs)]
+    job_totals.sort(key=lambda x: x[1])  # Sort by total time (ascending)
+    sorted_jobs = [job[0] for job in job_totals]
+    
+    # Build pendulum sequence: small jobs at ends, big jobs in center
+    sequence = [0] * num_jobs
+    left = 0
+    right = num_jobs - 1
+    
+    # Place jobs alternating from extremes toward center
+    for i, job_idx in enumerate(sorted_jobs):
+        if i % 2 == 0:  # Even indices: place at left extreme, move inward
+            sequence[left] = job_idx
+            left += 1
+        else:  # Odd indices: place at right extreme, move inward
+            sequence[right] = job_idx
+            right -= 1
+    
+    return sequence
+
+
 def random_sequence(processing_times: List[List[float]]) -> List[int]:
     """
     Generate a random job sequence.
@@ -280,7 +319,8 @@ def compare_heuristics(processing_times: List[List[float]]) -> List[Tuple[str, L
         'SPT': shortest_processing_time_first,
         'LPT': longest_processing_time_first,
         'Palmer': palmer_heuristic,
-        'CDS': cds_heuristic
+        'CDS': cds_heuristic,
+        'Pendulum': pendulum_heuristic
     }
     
     results = []

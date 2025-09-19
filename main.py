@@ -13,21 +13,16 @@ from typing import List, Optional
 # Import our modules
 from io_utils import read_csv_data, validate_processing_times, print_data_summary
 from makespan import calculate_makespan, print_sequence_analysis
-from heuristics import neh_heuristic, compare_heuristics, print_heuristic_comparison
-from improvements import apply_improvements, print_improvement_results
+from heuristics import pendulum_heuristic, compare_heuristics, print_heuristic_comparison
 
 
 def solve_flow_shop(csv_file_path: str, 
-                   use_improvements: bool = True,
-                   improvement_methods: List[str] = None,
                    verbose: bool = True) -> dict:
     """
     Main function to solve Flow Shop Scheduling Problem.
     
     Args:
         csv_file_path (str): Path to CSV file containing processing times
-        use_improvements (bool): Whether to apply improvement algorithms
-        improvement_methods (List[str], optional): List of improvement methods to use
         verbose (bool): Whether to print detailed output
         
     Returns:
@@ -47,54 +42,32 @@ def solve_flow_shop(csv_file_path: str,
         if verbose:
             print_data_summary(processing_times, job_names)
         
-        # Step 2: Apply NEH heuristic for initial solution
+        # Step 2: Apply Pendulum heuristic for main solution
         if verbose:
-            print("\nApplying NEH heuristic for initial solution...")
+            print("\nApplying Pendulum heuristic for main solution...")
         
-        neh_sequence = neh_heuristic(processing_times)
-        neh_makespan = calculate_makespan(processing_times, neh_sequence)
+        pendulum_sequence = pendulum_heuristic(processing_times)
+        pendulum_makespan = calculate_makespan(processing_times, pendulum_sequence)
         
         if verbose:
-            print(f"NEH Heuristic Result:")
-            print(f"  Sequence: {' -> '.join([job_names[i] for i in neh_sequence])}")
-            print(f"  Makespan: {neh_makespan:.2f}")
+            print(f"Pendulum Heuristic Result:")
+            print(f"  Sequence: {' -> '.join([job_names[i] for i in pendulum_sequence])}")
+            print(f"  Makespan: {pendulum_makespan:.2f}")
         
-        # Step 3: Compare different heuristics (optional detailed analysis)
+        # Step 3: Compare different heuristics
         if verbose:
             print_heuristic_comparison(processing_times, job_names)
         
-        # Step 4: Apply improvement algorithms
-        best_sequence = neh_sequence
-        best_makespan = neh_makespan
-        improvement_results = None
+        # Step 4: Final results (Pendulum is the main sequence)
+        best_sequence = pendulum_sequence
+        best_makespan = pendulum_makespan
         
-        if use_improvements:
-            if verbose:
-                print("\nApplying improvement algorithms...")
-            
-            if improvement_methods is None:
-                improvement_methods = ['2opt', 'insert', 'vns']  # Skip genetic for speed
-            
-            best_sequence, best_makespan, improvement_results = apply_improvements(
-                processing_times, neh_sequence, improvement_methods
-            )
-            
-            if verbose:
-                print_improvement_results(improvement_results, job_names)
-        
-        # Step 5: Final results
         if verbose:
             print("\n" + "=" * 60)
             print("FINAL RESULTS")
             print("=" * 60)
             print(f"Best sequence: {' -> '.join([job_names[i] for i in best_sequence])}")
             print(f"Best makespan: {best_makespan:.2f}")
-            
-            if use_improvements and improvement_results:
-                initial_makespan = improvement_results['initial'][1]
-                improvement_pct = ((initial_makespan - best_makespan) / initial_makespan * 100)
-                print(f"Improvement over NEH: {improvement_pct:.1f}%")
-            
             print("=" * 60)
             
             # Detailed analysis of best sequence
@@ -106,9 +79,8 @@ def solve_flow_shop(csv_file_path: str,
             'best_makespan': best_makespan,
             'job_names': job_names,
             'processing_times': processing_times,
-            'neh_sequence': neh_sequence,
-            'neh_makespan': neh_makespan,
-            'improvement_results': improvement_results
+            'pendulum_sequence': pendulum_sequence,
+            'pendulum_makespan': pendulum_makespan
         }
         
     except FileNotFoundError as e:
@@ -151,7 +123,7 @@ def create_sample_data(file_path: str, num_jobs: int = 5, num_machines: int = 3)
 def main():
     """Main function with command-line interface."""
     parser = argparse.ArgumentParser(
-        description="Flow Shop Scheduling Problem Solver using NEH heuristic and improvements"
+        description="Flow Shop Scheduling Problem Solver using constructive heuristics"
     )
     
     parser.add_argument(
@@ -160,19 +132,6 @@ def main():
         help='Path to CSV file containing processing times'
     )
     
-    parser.add_argument(
-        '--no-improvements', 
-        action='store_true',
-        help='Skip improvement algorithms (use only NEH heuristic)'
-    )
-    
-    parser.add_argument(
-        '--methods', 
-        nargs='+',
-        choices=['2opt', 'insert', 'vns', 'genetic'],
-        default=['2opt', 'insert', 'vns'],
-        help='Improvement methods to use'
-    )
     
     parser.add_argument(
         '--quiet', 
@@ -226,8 +185,6 @@ def main():
     # Solve the problem
     results = solve_flow_shop(
         csv_file_path=csv_file,
-        use_improvements=not args.no_improvements,
-        improvement_methods=args.methods,
         verbose=not args.quiet
     )
     
