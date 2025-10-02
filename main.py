@@ -11,7 +11,7 @@ import argparse
 from typing import List, Optional
 
 # Import our modules
-from io_utils import read_csv_data, validate_processing_times, print_data_summary
+from io_utils import read_instance, validate_processing_times, print_data_summary
 from makespan import calculate_makespan, print_sequence_analysis
 from heuristics import pendulum_heuristic, compare_heuristics, print_heuristic_comparison
 
@@ -36,7 +36,7 @@ def solve_flow_shop(csv_file_path: str,
             print("=" * 60)
             print(f"Reading data from: {csv_file_path}")
         
-        processing_times, job_names = read_csv_data(csv_file_path)
+        processing_times, job_names = read_instance(csv_file_path)
         validate_processing_times(processing_times)
         
         if verbose:
@@ -129,7 +129,7 @@ def main():
     parser.add_argument(
         'csv_file', 
         nargs='?',
-        help='Path to CSV file containing processing times'
+        help='Path to instance file (.csv or Taillard .txt) containing processing times'
     )
     
     
@@ -170,7 +170,7 @@ def main():
     if not args.csv_file:
         # Create and use default sample if no file provided
         sample_path = "sample_flow_shop_data.csv"
-        print("No CSV file provided. Creating sample data...")
+        print("No instance file provided. Creating sample data...")
         create_sample_data(sample_path)
         csv_file = sample_path
     else:
