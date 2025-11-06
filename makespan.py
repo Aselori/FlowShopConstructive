@@ -65,6 +65,84 @@ def calculate_makespan(processing_times: List[List[float]], sequence: List[int])
     return completion_times[-1][-1] if completion_times else 0.0
 
 
+def calculate_completion_times(processing_times: List[List[float]],
+                               sequence: List[int]) -> List[List[float]]:
+    """
+    Compute and return the full completion time matrix for a given sequence.
+    This mirrors the recurrence used in calculate_makespan.
+    """
+    if not processing_times or not sequence:
+        return []
+    num_jobs = len(processing_times)
+    num_machines = len(processing_times[0]) if num_jobs > 0 else 0
+    completion_times = [[0.0 for _ in range(num_machines)] for _ in range(len(sequence))]
+    for seq_pos, job_idx in enumerate(sequence):
+        for machine in range(num_machines):
+            proc_time = processing_times[job_idx][machine]
+            if seq_pos == 0 and machine == 0:
+                completion_times[seq_pos][machine] = proc_time
+            elif seq_pos == 0:
+                completion_times[seq_pos][machine] = (
+                    completion_times[seq_pos][machine - 1] + proc_time
+                )
+            elif machine == 0:
+                completion_times[seq_pos][machine] = (
+                    completion_times[seq_pos - 1][machine] + proc_time
+                )
+            else:
+                completion_times[seq_pos][machine] = (
+                    max(completion_times[seq_pos - 1][machine],
+                        completion_times[seq_pos][machine - 1]) + proc_time
+                )
+    return completion_times
+
+
+def calculate_makespan_delta(processing_times: List[List[float]],
+                             sequence: List[int],
+                             swap_pos: int,
+                             completion_times: List[List[float]]) -> Tuple[float, List[List[float]]]:
+    """
+    Fast makespan recomputation for swapping adjacent jobs at swap_pos and swap_pos+1.
+    Recomputes completion times from swap_pos onward using the standard recurrence.
+
+    Returns the new makespan and the updated completion time matrix.
+    """
+    n = len(sequence)
+    if n == 0:
+        return 0.0, []
+    if swap_pos < 0 or swap_pos >= n - 1:
+        raise ValueError("swap_pos out of range")
+
+    num_machines = len(processing_times[0]) if processing_times else 0
+
+    # Apply the swap to a copy of the sequence
+    new_seq = sequence.copy()
+    new_seq[swap_pos], new_seq[swap_pos + 1] = new_seq[swap_pos + 1], new_seq[swap_pos]
+
+    # Prepare a new completion matrix; copy rows before swap_pos as-is
+    new_ct = (
+        [row[:] for row in completion_times]
+        if completion_times
+        else [[0.0 for _ in range(num_machines)] for _ in range(n)]
+    )
+
+    start_row = max(0, swap_pos)
+    for seq_pos in range(start_row, n):
+        job_idx = new_seq[seq_pos]
+        for machine in range(num_machines):
+            proc_time = processing_times[job_idx][machine]
+            if seq_pos == 0 and machine == 0:
+                new_ct[seq_pos][machine] = proc_time
+            elif seq_pos == 0:
+                new_ct[seq_pos][machine] = new_ct[seq_pos][machine - 1] + proc_time
+            elif machine == 0:
+                new_ct[seq_pos][machine] = new_ct[seq_pos - 1][machine] + proc_time
+            else:
+                new_ct[seq_pos][machine] = max(new_ct[seq_pos - 1][machine], new_ct[seq_pos][machine - 1]) + proc_time
+
+    return (new_ct[-1][-1] if new_ct else 0.0), new_ct
+
+
 def calculate_idle_times(processing_times: List[List[float]], 
                         sequence: List[int]) -> Tuple[List[float], float]:
     """
@@ -126,7 +204,7 @@ def print_sequence_analysis(processing_times: List[List[float]],
                           sequence: List[int], 
                           job_names: List[str] = None) -> None:
     """
-    Print detailed analysis of a job sequence.
+    Print analysis of a job sequence.
     
     Args:
         processing_times: Matrix of processing times
@@ -145,23 +223,7 @@ def print_sequence_analysis(processing_times: List[List[float]],
     
     # Calculate metrics
     makespan = calculate_makespan(processing_times, sequence)
-    idle_times, total_idle = calculate_idle_times(processing_times, sequence)
-    
-    # Calculate machine utilization
-    total_processing = sum(sum(job) for job in processing_times)
-    utilization = (total_processing / (makespan * num_machines)) * 100 if makespan > 0 else 0
     
     # Print analysis
-    print("\nDETAILED ANALYSIS")
-    print("=" * 60)
-    print(f"Sequence: {' -> '.join([job_names[i] for i in sequence])}")
-    print(f"\nMakespan: {makespan:.2f}")
-    
-    # Print machine idle times
-    print("\nMachine Idle Times:")
-    for machine in range(num_machines):
-        print(f"  Machine {machine + 1}: {idle_times[machine]:.2f}")
-    
-    print(f"\nTotal Idle Time: {total_idle:.2f}")
-    print(f"Machine Utilization: {utilization:.1f}%")
-    print("=" * 60)
+    print(f"\nSequence: {' -> '.join([job_names[i] for i in sequence])}")
+    print(f"Makespan: {makespan:.2f}")

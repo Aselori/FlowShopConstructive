@@ -18,7 +18,7 @@ from typing import List, Optional, Dict, Any
 from io_utils import read_instance, validate_processing_times, print_data_summary
 from makespan import calculate_makespan, print_sequence_analysis
 from heuristics import pendulum_heuristic
-
+from local_search import local_search_main
 
 def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
     """
@@ -43,28 +43,61 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
         # Print data summary
         print_data_summary(processing_times, job_names)
         
-        # Apply Pendulum heuristic
-        print("\nApplying Pendulum heuristic...")
-        sequence = pendulum_heuristic(processing_times)
-        makespan = calculate_makespan(processing_times, sequence)
+        # Get initial solution using pendulum heuristic
+        initial_sequence = pendulum_heuristic(processing_times)
+        initial_makespan = calculate_makespan(processing_times, initial_sequence)
         
-        # Print results
-        print("\n" + "=" * 60)
-        print("SOLUTION")
-        print("=" * 60)
-        print(f"Best sequence: {' -> '.join([job_names[i] for i in sequence])}")
-        print(f"Makespan: {makespan:.2f}")
-        print("=" * 60)
+        # Print initial solution
+        print("\n--- Initial Solution ---")
+        print(f"Makespan: {initial_makespan}")
+        print_sequence_analysis(processing_times, initial_sequence, job_names)
         
-        # Detailed analysis
-        print_sequence_analysis(processing_times, sequence, job_names)
-        
-        return {
-            'sequence': sequence,
-            'makespan': makespan,
-            'job_names': job_names,
-            'processing_times': processing_times
-        }
+        # Run local search to improve the solution
+        print("\n--- Local Search Phase ---")
+        try:
+            improved_sequence, improved_makespan, iters_used = local_search_main(
+                initial_sequence=initial_sequence,
+                processing_times=processing_times,
+                max_iterations=1000,
+                top_k=None,
+                search_mode="best",
+                recompute_bottleneck=True,
+                time_budget_seconds=None,
+                verbose=False
+            )
+            
+            # Print results
+            print("\n--- Results ---")
+            print(f"Initial makespan: {initial_makespan}")
+            print(f"Improved makespan: {improved_makespan}")
+            if initial_makespan > 0:  # Avoid division by zero
+                improvement = ((initial_makespan - improved_makespan) / initial_makespan) * 100
+                print(f"Improvement: {initial_makespan - improved_makespan:.2f} ({improvement:.2f}%)")
+            print(f"Iterations used: {iters_used}")
+            
+            # Print detailed analysis of improved solution
+            print("\n--- Improved Solution ---")
+            print_sequence_analysis(processing_times, improved_sequence, job_names)
+            
+            return {
+                'sequence': improved_sequence,
+                'makespan': improved_makespan,
+                'initial_makespan': initial_makespan,
+                'job_names': job_names,
+                'processing_times': processing_times,
+                'iterations_used': iters_used
+            }
+            
+        except Exception as e:
+            print(f"\nError during local search: {e}")
+            print("Falling back to initial solution.")
+            return {
+                'sequence': initial_sequence,
+                'makespan': initial_makespan,
+                'job_names': job_names,
+                'processing_times': processing_times,
+                'error': str(e)
+            }
         
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -75,6 +108,7 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print(f"Unexpected error: {e}")
         return None
+
 
 
 def main():
