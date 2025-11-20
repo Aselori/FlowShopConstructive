@@ -163,6 +163,11 @@ def print_data_summary(processing_times: List[List[float]], job_names: List[str]
 def read_taillard_txt(file_path: str) -> Tuple[List[List[float]], List[str]]:
     """
     Read a Flow Shop instance in Taillard-style TXT/FSP format.
+    
+    Note: Taillard format stores data as MACHINES-AS-ROWS (JOBS-AS-COLUMNS).
+    Each row in the file represents one machine, with values for all jobs.
+    This function reads the file format and TRANSPOSES it to the expected
+    jobs-as-rows format (each row = one job, each column = one machine).
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"TXT/FSP file not found: {file_path}")
@@ -180,12 +185,14 @@ def read_taillard_txt(file_path: str) -> Tuple[List[List[float]], List[str]]:
         if look_for_counts_next:
             ints = re.findall(r"-?\d+", line)
             if len(ints) >= 2:
-                n = int(ints[0])
-                m = int(ints[1])
+                n = int(ints[0])  # number of jobs
+                m = int(ints[1])  # number of machines
                 break
     if n is None or m is None:
         raise ValueError("Could not parse number of jobs and machines from TXT header.")
 
+    # Taillard format: file has M rows (machines) with N values each (jobs)
+    # Read all tokens first, then organize as machines-as-rows, then transpose to jobs-as-rows
     proc_tokens: List[float] = []
     collecting = False
     for line in lines:
@@ -193,22 +200,33 @@ def read_taillard_txt(file_path: str) -> Tuple[List[List[float]], List[str]]:
             if 'processing times' in line.strip().lower():
                 collecting = True
             continue
-        ints = re.findall(r"-?\d+", line)
-        proc_tokens.extend(float(x) for x in ints)
-        if len(proc_tokens) >= n * m:
-            break
+        if collecting:
+            ints = re.findall(r"-?\d+", line)
+            proc_tokens.extend(float(x) for x in ints)
+            if len(proc_tokens) >= n * m:
+                break
 
     if len(proc_tokens) < n * m:
         raise ValueError(f"Expected {n*m} processing times, found {len(proc_tokens)}.")
 
-    processing_times: List[List[float]] = []
+    # Organize tokens as machines-as-rows (m rows, n columns)
+    # Each row in file represents one machine with times for all jobs
+    machines_data: List[List[float]] = []
     idx = 0
-    for _ in range(n):
-        row = proc_tokens[idx: idx + m]
-        if len(row) != m:
-            raise ValueError("Malformed processing times: incomplete row detected.")
-        processing_times.append(row)
-        idx += m
+    for machine_idx in range(m):
+        row = proc_tokens[idx: idx + n]
+        if len(row) != n:
+            raise ValueError(f"Machine {machine_idx} row incomplete: expected {n} values, found {len(row)}")
+        machines_data.append(row)
+        idx += n
+
+    # Transpose: convert from machines-as-rows to jobs-as-rows
+    # machines_data[i][j] = time for job j on machine i
+    # processing_times[i][j] = time for job i on machine j (expected format)
+    processing_times: List[List[float]] = []
+    for job_idx in range(n):
+        job_times = [machines_data[machine_idx][job_idx] for machine_idx in range(m)]
+        processing_times.append(job_times)
 
     job_names = [f"Job_{i+1}" for i in range(n)]
     return processing_times, job_names

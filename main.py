@@ -17,7 +17,7 @@ from typing import List, Optional, Dict, Any
 # Import our modules
 from io_utils import read_instance, validate_processing_times, print_data_summary
 from makespan import calculate_makespan, print_sequence_analysis
-from heuristics import pendulum_heuristic
+from heuristics import pendulum_heuristic, randomized_constructive_heuristic
 from local_search import local_search_main
 
 def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
@@ -43,8 +43,59 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
         # Print data summary
         print_data_summary(processing_times, job_names)
         
-        # Get initial solution using pendulum heuristic
-        initial_sequence = pendulum_heuristic(processing_times)
+        # Get initial solution using user-selected heuristic
+        print("\n--- Select Heuristic Method ---")
+        print("a: Alpha randomization")
+        print("k: K-best randomization") 
+        print("n: None (use standard pendulum heuristic)")
+        
+        while True:
+            choice = input("Enter your choice (a/k/n): ").lower().strip()
+            if choice in ['a', 'k', 'n']:
+                break
+            print("Invalid choice. Please enter 'a', 'k', or 'n'")
+        
+        if choice == 'a':
+            while True:
+                try:
+                    alpha = float(input("Enter alpha value (0.1-1.0, e.g., 0.5): "))
+                    if 0 < alpha < 1:
+                        break
+                    else:
+                        print("Alpha must be between 0 and 1")
+                except ValueError:
+                    print("Please enter a valid number")
+            
+            initial_sequence = randomized_constructive_heuristic(
+                processing_times, 
+                method='alpha', 
+                param=alpha,
+                seed=42
+            )
+            print(f"Using alpha randomization with param={alpha}")
+            
+        elif choice == 'k':
+            while True:
+                try:
+                    k = int(input("Enter k value (>=1, e.g., 5): "))
+                    if k >= 1:
+                        break
+                    else:
+                        print("K must be >= 1")
+                except ValueError:
+                    print("Please enter a valid integer")
+            
+            initial_sequence = randomized_constructive_heuristic(
+                processing_times, 
+                method='kbest', 
+                param=k,
+                seed=42
+            )
+            print(f"Using k-best randomization with param={k}")
+            
+        else:  # choice == 'n'
+            initial_sequence = pendulum_heuristic(processing_times)
+            print("Using standard pendulum heuristic")
         initial_makespan = calculate_makespan(processing_times, initial_sequence)
         
         # Print initial solution
@@ -55,7 +106,7 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
         # Run local search to improve the solution
         print("\n--- Local Search Phase ---")
         try:
-            improved_sequence, improved_makespan, iters_used = local_search_main(
+            improved_sequence, improved_makespan, iters_used, search_time = local_search_main(
                 initial_sequence=initial_sequence,
                 processing_times=processing_times,
                 max_iterations=1000,
@@ -74,6 +125,7 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
                 improvement = ((initial_makespan - improved_makespan) / initial_makespan) * 100
                 print(f"Improvement: {initial_makespan - improved_makespan:.2f} ({improvement:.2f}%)")
             print(f"Iterations used: {iters_used}")
+            print(f"Local search time: {search_time:.4f} seconds")
             
             # Print detailed analysis of improved solution
             print("\n--- Improved Solution ---")
@@ -85,7 +137,8 @@ def solve_flow_shop(file_path: str) -> Optional[Dict[str, Any]]:
                 'initial_makespan': initial_makespan,
                 'job_names': job_names,
                 'processing_times': processing_times,
-                'iterations_used': iters_used
+                'iterations_used': iters_used,
+                'search_time': search_time
             }
             
         except Exception as e:

@@ -169,7 +169,7 @@ def local_search_main(initial_sequence: List[int],
                      verbose: bool = False,
                      search_mode: str = "best",
                      recompute_bottleneck: bool = True,
-                     time_budget_seconds: Optional[float] = 30.0) -> Tuple[List[int], float, int]:
+                     time_budget_seconds: Optional[float] = 30.0) -> Tuple[List[int], float, int, float]:
     """
     Perform local search using bottleneck-aware adjacent swaps (deterministic first-improvement).
     
@@ -181,11 +181,11 @@ def local_search_main(initial_sequence: List[int],
         verbose: Whether to print progress
         
     Returns:
-        Tuple of (best_sequence, best_makespan, iterations_used)
+        Tuple of (best_sequence, best_makespan, iterations_used, search_time)
     """
     # Input validation
     if not initial_sequence or not processing_times:
-        return initial_sequence, 0.0, 0
+        return initial_sequence, 0.0, 0, 0.0
     
     num_jobs = len(processing_times)
     num_machines = len(processing_times[0]) if num_jobs > 0 else 0
@@ -194,7 +194,8 @@ def local_search_main(initial_sequence: List[int],
         raise ValueError("Sequence length must match number of jobs")
     
     if num_jobs <= 1:
-        return initial_sequence, calculate_makespan(processing_times, initial_sequence), 0
+        makespan = calculate_makespan(processing_times, initial_sequence)
+        return initial_sequence, makespan, 0, 0.0
     
     # Initialize
     current_sequence = initial_sequence.copy()
@@ -404,8 +405,11 @@ def local_search_main(initial_sequence: List[int],
                 if not improved_window:
                     break
 
+    # Calculate total search time
+    search_time = time.perf_counter() - start_time
+    
     # Always return the best solution found (robust to non-improving perturbations)
-    return best_sequence, best_makespan, iterations_used
+    return best_sequence, best_makespan, iterations_used, search_time
 
 # Add this at the end to avoid circular imports
 from makespan import calculate_makespan, calculate_completion_times, calculate_makespan_delta
